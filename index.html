@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Chitrarekha Sehat Setu: health information kiosk prototype for village Tighra (UEDP-5).">
+<title>चित्ररेखा सेहत सेतु</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mukta:wght@500;700;800&family=Hind:wght@400;500;600&display=swap">
+<style>
+/* Layout: kiosk = fixed header + one scrolling "story" per topic (photo hook first, then 2–3 short sections) + fixed bottom topic bar.
+   Single deliberate light theme: a public kiosk in a health centre, matched to the existing Sehat Setu identity. */
+:root {
+  color-scheme: light;
+  --forest: #0E4A3A;      /* primary: trust, government health */
+  --forest-2: #15634E;
+  --brick: #8A3A22;       /* emergency / warning */
+  --sun: #F5C84B;         /* highlight, audio */
+  --cream: #F6F3EA;       /* page ground */
+  --paper: #FFFFFF;
+  --ink: #1B2420;
+  --ink-2: #4B5A53;
+  --line: #DCD6C6;
+  --ok: #1F7A4D;  --ok-bg: #E2F3E8;
+  --no: #B3261E;  --no-bg: #FBE4E1;
+  --display: "Mukta", "Noto Sans Devanagari", system-ui, sans-serif;
+  --body: "Hind", "Noto Sans Devanagari", system-ui, sans-serif;
+  --r: 22px;
+  --tap: 64px;            /* minimum touch target on the kiosk */
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--cream); color: var(--ink); font-family: var(--body); font-size: 20px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 4px solid var(--sun); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; line-height: 1.15; }
+
+.app { height: 100%; display: grid; grid-template-rows: auto 1fr auto; max-width: 1400px; margin: 0 auto; background: var(--cream); position: relative; overflow: hidden; }
+
+/* ---------- header ---------- */
+.top { display: flex; align-items: center; gap: 14px; padding-block: 12px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); background: var(--paper); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; background: none; border: 0; padding: 0; text-align: left; }
+.mark { width: 48px; height: 48px; border-radius: 14px; background: var(--forest); display: grid; place-items: center; flex: none; }
+.brand b { font-family: var(--display); font-size: 24px; font-weight: 800; color: var(--forest); display: block; line-height: 1.1; }
+.brand small { font-size: 14px; color: var(--ink-2); }
+.top .sp { flex: 1; }
+.chip { display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 18px; border-radius: 999px; border: 0; font-weight: 600; font-size: 18px; }
+.chip.audio { background: var(--sun); color: var(--ink); }
+.chip.audio.on { animation: pulse 1.2s ease-in-out infinite; }
+.chip.lang { background: var(--cream); border: 1px solid var(--line); color: var(--ink-2); }
+.chip.lang .on { color: var(--forest); font-weight: 800; }
+.chip.sos { background: var(--brick); color: #fff; font-family: var(--display); font-size: 21px; font-weight: 800; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 10px rgba(245, 200, 75, .35); } }
+
+/* ---------- screens ---------- */
+.stage { position: relative; overflow: hidden; }
+.screen { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth; }
+.screen[hidden] { display: none !important; }
+.screen.enter { animation: enter .42s cubic-bezier(.2, .7, .2, 1); }
+@keyframes enter { from { opacity: .0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.wrap { padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); padding-block: 22px 40px; display: grid; gap: 26px; }
+
+/* home */
+.welcome { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; background: var(--forest); color: #fff; border-radius: var(--r); padding: 26px 30px; }
+.welcome h1 { font-size: clamp(30px, 3.4vw, 44px); font-weight: 800; }
+.welcome p { margin: 6px 0 0; color: #CFE3DA; font-size: 19px; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.tile { position: relative; border: 0; padding: 0; border-radius: var(--r); overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; text-align: left; background: var(--forest); color: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.06); transition: transform .18s ease; }
+.tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .6s ease; }
+.tile::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(7, 30, 23, 0) 30%, rgba(7, 30, 23, .88) 100%); }
+.tile:hover img { transform: scale(1.04); }
+.tile:active { transform: scale(.97); }
+.tile .num { position: absolute; z-index: 1; top: 14px; left: 14px; width: 46px; height: 46px; border-radius: 12px; background: rgba(255,255,255,.94); color: var(--forest); font-family: var(--display); font-weight: 800; font-size: 22px; display: grid; place-items: center; }
+.tile .badge { position: absolute; z-index: 1; top: 16px; right: 14px; background: var(--sun); color: var(--ink); font-weight: 600; font-size: 16px; padding: 6px 12px; border-radius: 999px; }
+.tile .cap { position: absolute; z-index: 1; left: 18px; right: 18px; bottom: 16px; }
+.tile h2 { font-size: clamp(24px, 2.4vw, 32px); font-weight: 800; }
+.tile .cap span { font-size: 17px; color: #E4EFE9; }
+.sosbar { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 14px; align-items: center; background: var(--paper); border-radius: var(--r); padding: 16px; border: 1px solid var(--line); }
+.sosbar > b { font-family: var(--display); font-size: 22px; padding: 0 8px; }
+.callbtn { min-height: var(--tap); border-radius: 16px; border: 0; font-family: var(--display); font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; }
+.callbtn small { font-family: var(--body); font-weight: 500; font-size: 16px; opacity: .9; }
+.c108 { background: var(--brick); } .c104 { background: var(--forest); } .c181 { background: var(--sun); color: var(--ink); }
+
+/* topic story */
+.hero { position: relative; min-height: 470px; border-radius: 0 0 var(--r) var(--r); overflow: hidden; display: flex; align-items: flex-end; color: #fff; }
+.hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: kb 14s ease-out both; }
+@keyframes kb { from { transform: scale(1.08); } to { transform: scale(1); } }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6, 28, 21, .92) 0%, rgba(6, 28, 21, .55) 48%, rgba(6, 28, 21, .05) 80%); }
+.hero .in { position: relative; z-index: 1; padding: 34px 36px 30px; max-width: 760px; display: grid; gap: 16px; }
+.eyebrow { display: inline-flex; width: max-content; max-width: 100%; align-items: center; gap: 8px; font-weight: 600; font-size: 16px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); padding: 5px 12px; border-radius: 999px; }
+.hero h1 { font-size: clamp(36px, 4.6vw, 60px); font-weight: 800; }
+.hero h1 em { font-style: normal; color: var(--sun); }
+.bigstat { display: flex; gap: 14px; flex-wrap: wrap; }
+.bigstat div { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 16px; padding: 10px 16px; }
+.bigstat b { font-family: var(--display); font-size: 34px; font-weight: 800; color: var(--sun); display: block; line-height: 1; font-variant-numeric: tabular-nums; }
+.bigstat span { font-size: 16px; color: #E0ECE6; }
+.scrollcue { display: inline-flex; align-items: center; gap: 10px; width: max-content; background: var(--paper); color: var(--forest); border: 0; border-radius: 999px; padding: 10px 20px; min-height: 52px; font-weight: 600; font-size: 18px; }
+.scrollcue svg { animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(5px); } }
+
+.sec { display: grid; gap: 16px; }
+.sec > h2 { font-size: 30px; font-weight: 800; color: var(--forest); display: flex; align-items: center; gap: 12px; }
+.sec > h2 .ic { width: 44px; height: 44px; border-radius: 12px; background: var(--forest); display: grid; place-items: center; flex: none; }
+.cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.card { background: var(--paper); border-radius: var(--r); padding: 22px; border: 1px solid var(--line); display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h3 { font-size: 25px; font-weight: 800; }
+.card .km { font-family: var(--display); font-weight: 800; font-size: 46px; line-height: 1; color: var(--forest); font-variant-numeric: tabular-nums; }
+.card .km small { font-size: 22px; }
+.meta { color: var(--ink-2); font-size: 18px; }
+.pill { display: inline-block; width: max-content; font-size: 15px; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: var(--cream); border: 1px solid var(--line); }
+.pill.red { background: var(--no-bg); color: var(--brick); border-color: #F1C4BC; }
+.pill.green { background: var(--ok-bg); color: var(--ok); border-color: #BFE3CB; }
+.ticks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 19px; }
+.ticks li { display: flex; gap: 10px; align-items: baseline; }
+.ticks li::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--sun); transform: translateY(-2px); }
+.cta { min-height: var(--tap); border: 0; border-radius: 16px; background: var(--forest); color: #fff; font-weight: 600; font-size: 19px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 18px; }
+.cta.red { background: var(--brick); }
+.cta.ghost { background: var(--cream); color: var(--forest); border: 1px solid var(--line); }
+
+/* route line */
+.route { background: var(--paper); border-radius: var(--r); border: 1px solid var(--line); padding: 26px 30px; }
+.route .line { position: relative; height: 10px; background: var(--line); border-radius: 10px; margin: 34px 8px 16px; }
+.route .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--forest); border-radius: 10px; transition: width 1.4s cubic-bezier(.2,.7,.2,1); }
+.route .stop { position: absolute; top: 50%; width: 26px; height: 26px; border-radius: 50%; background: var(--paper); border: 6px solid var(--forest); transform: translate(-50%, -50%); }
+.route .stop.last { border-color: var(--brick); }
+.route .labels { position: relative; height: 62px; font-size: 18px; }
+.route .labels span { position: absolute; top: 0; white-space: nowrap; }
+.route .labels b { font-family: var(--display); font-size: 22px; display: block; }
+
+/* steps */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.step { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; display: grid; gap: 8px; align-content: start; }
+.step .n { width: 52px; height: 52px; border-radius: 50%; background: var(--sun); font-family: var(--display); font-weight: 800; font-size: 26px; display: grid; place-items: center; }
+.step h3 { font-size: 24px; font-weight: 800; }
+.step p { margin: 0; color: var(--ink-2); font-size: 19px; }
+
+/* do / don't */
+.dd { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ddcard { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; display: grid; }
+.ddcard header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; }
+.ddcard header .em { width: 48px; height: 48px; border-radius: 14px; background: var(--cream); display: grid; place-items: center; flex: none; }
+.ddcard h3 { font-size: 25px; font-weight: 800; }
+.ddrow { display: grid; grid-template-columns: 1fr 1fr; }
+.ddrow > div { padding: 14px 20px 18px; font-size: 19px; line-height: 1.4; display: grid; gap: 4px; align-content: start; }
+.ddrow .do { background: var(--ok-bg); } .ddrow .dont { background: var(--no-bg); }
+.ddrow b { font-family: var(--display); font-size: 18px; }
+.ddrow .do b { color: var(--ok); } .ddrow .dont b { color: var(--no); }
+
+/* recipe */
+.recipe { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 14px; align-items: center; background: var(--forest); color: #fff; border-radius: var(--r); padding: 22px; }
+.recipe .ing { background: rgba(255,255,255,.1); border-radius: 16px; padding: 14px; text-align: center; }
+.recipe .ing b { font-family: var(--display); font-size: 34px; color: var(--sun); display: block; line-height: 1.1; }
+.recipe .ing span { font-size: 17px; }
+
+/* habits */
+.habits { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.habit { min-height: 120px; border-radius: 18px; border: 2px dashed var(--line); background: var(--paper); padding: 14px; text-align: left; display: grid; gap: 8px; align-content: space-between; font-size: 18px; font-weight: 500; transition: background .2s, border-color .2s, transform .15s; }
+.habit .box { width: 34px; height: 34px; border-radius: 10px; border: 2px solid var(--line); display: grid; place-items: center; transition: all .2s; }
+.habit[aria-pressed="true"] { border: 2px solid var(--ok); background: var(--ok-bg); }
+.habit[aria-pressed="true"] .box { background: var(--ok); border-color: var(--ok); }
+.habit[aria-pressed="true"] .box::after { content: ""; width: 9px; height: 16px; border: solid #fff; border-width: 0 4px 4px 0; transform: rotate(45deg) translate(-1px, -2px); animation: pop .25s ease; }
+.habit:active { transform: scale(.97); }
+@keyframes pop { from { transform: rotate(45deg) scale(0); } }
+.score { display: flex; align-items: center; gap: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 20px; }
+.meter { flex: 1; height: 14px; border-radius: 10px; background: var(--cream); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: var(--ok); border-radius: 10px; transition: width .4s ease; }
+.score b { font-family: var(--display); font-size: 26px; font-variant-numeric: tabular-nums; }
+
+/* medicine grid */
+.meds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.med { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 18px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+.med .ico { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; background: var(--ok-bg); }
+.med h3 { font-size: 22px; font-weight: 800; }
+.med p { margin: 0; color: var(--ink-2); font-size: 17px; line-height: 1.35; }
+
+/* myth flip cards */
+.myths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.flip { border: 0; padding: 0; background: none; perspective: 1400px; min-height: 270px; text-align: left; }
+.flip .inner { position: relative; width: 100%; height: 100%; min-height: 270px; transition: transform .6s cubic-bezier(.3,.7,.2,1); transform-style: preserve-3d; }
+.flip[aria-pressed="true"] .inner { transform: rotateY(180deg); }
+.face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: var(--r); padding: 24px; display: grid; gap: 10px; align-content: space-between; }
+.face.myth { background: var(--no-bg); border: 2px solid #F1C4BC; }
+.face.fact { background: var(--ok-bg); border: 2px solid #BFE3CB; transform: rotateY(180deg); }
+.face .tag { font-family: var(--display); font-weight: 800; font-size: 20px; display: flex; align-items: center; gap: 8px; }
+.face.myth .tag { color: var(--no); } .face.fact .tag { color: var(--ok); }
+.face q { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.25; quotes: "“" "”"; }
+.face p { margin: 0; font-family: var(--display); font-weight: 700; font-size: 25px; line-height: 1.3; }
+.face .hint { font-size: 17px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+
+/* contact band */
+.band { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; background: var(--forest); color: #fff; border-radius: var(--r); padding: 22px 26px; }
+.band h3 { font-size: 25px; } .band p { margin: 4px 0 0; color: #CFE3DA; font-size: 18px; }
+.band .callbtn { padding: 0 22px; }
+.band .c104 { background: var(--sun); color: var(--ink); }
+
+/* bottom nav */
+.nav { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; background: var(--paper); border-top: 1px solid var(--line); padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+.nav button { min-height: 68px; border-radius: 16px; border: 1px solid var(--line); background: var(--cream); display: grid; place-items: center; gap: 2px; padding: 6px; font-size: 16px; font-weight: 600; line-height: 1.2; text-align: center; transition: background .2s, color .2s; }
+.nav button[aria-current="page"] { background: var(--forest); color: #fff; border-color: var(--forest); }
+
+/* call sheet */
+.sheet { position: absolute; inset: 0; background: rgba(10, 22, 18, .55); display: grid; place-items: center; z-index: 20; animation: fade .2s ease; padding: 20px; }
+.sheet[hidden] { display: none !important; }
+@keyframes fade { from { opacity: 0; } }
+.sheet .box { background: var(--paper); border-radius: 26px; padding: 30px; width: min(520px, 100%); text-align: center; display: grid; gap: 14px; animation: rise .3s cubic-bezier(.2,.7,.2,1); }
+@keyframes rise { from { transform: translateY(30px); opacity: 0; } }
+.sheet .num { font-family: var(--display); font-weight: 800; font-size: 96px; line-height: 1; color: var(--brick); letter-spacing: .02em; }
+.sheet p { margin: 0; font-size: 20px; color: var(--ink-2); }
+
+.toast { position: absolute; left: 50%; bottom: 104px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 12px 22px; border-radius: 999px; font-size: 18px; z-index: 30; animation: rise .25s ease; max-width: calc(100% - 40px); text-align: center; }
+.toast[hidden] { display: none !important; }
+
+/* heat-map (testing tool) */
+#heat { position: absolute; inset: 0; pointer-events: none; z-index: 40; }
+.testbar { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: 86px; z-index: 41; display: flex; gap: 8px; background: var(--ink); color: #fff; border-radius: 14px; padding: 8px; font-size: 14px; align-items: center; }
+.testbar[hidden] { display: none !important; }
+.testbar button { background: #34413B; border: 0; color: #fff; border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+
+@media (max-width: 900px) {
+  .tiles, .meds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .steps, .dd, .myths { grid-template-columns: 1fr; }
+  .habits { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recipe { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .recipe .cta { grid-column: 1 / -1; }
+  .band { grid-template-columns: 1fr; }
+  .nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sosbar { grid-template-columns: 1fr; }
+  .welcome { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .tiles, .meds { grid-template-columns: 1fr; }
+  .brand small { display: none; }
+  .top { gap: 8px; }
+  .chip { padding: 0 12px; font-size: 16px; }
+  .ddrow { grid-template-columns: 1fr; }
+  .hero { min-height: 520px; }
+}
+/* documentation export (full-length capture) */
+.doc .app { height: auto; overflow: visible; }
+.doc .stage, .doc .screen { position: static; overflow: visible; }
+.doc .screen.enter, .doc .hero img { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <button class="brand" data-go="home" id="brand">
+      <span class="mark"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F5C84B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/><path d="M12 9v5M9.5 11.5h5"/></svg></span>
+      <span><b id="brandName">चित्ररेखा सेहत सेतु</b><small id="brandSub">ग्राम तिघरा, बरघाट · कियोस्क TGH-01</small></span>
+    </button>
+    <span class="sp"></span>
+    <button class="chip audio" id="audio" aria-pressed="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span id="audioLbl">सुनें</span></button>
+    <button class="chip lang" id="lang" aria-label="भाषा बदलें / Change language"><span data-l="hi" class="on">हिंदी</span>·<span data-l="en">English</span></button>
+    <button class="chip sos" data-call="108" id="sosTop">108 आपातकाल</button>
+  </header>
+
+  <main class="stage" id="stage"></main>
+
+  <nav class="nav" id="nav"></nav>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="box" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <p id="sheetTitle">अपने फ़ोन से यह नंबर मिलाएँ</p>
+      <div class="num" id="sheetNum">108</div>
+      <p id="sheetSub">कॉल मुफ़्त है · 24 घंटे</p>
+      <button class="cta" id="sheetClose">ठीक है</button>
+    </div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+  <canvas id="heat"></canvas>
+  <div class="testbar" id="testbar" hidden>
+    <span>Test mode · taps: <b id="tapCount">0</b></span>
+    <button id="heatShow">Show heat map</button>
+    <button id="heatClear">Clear</button>
+  </div>
+</div>
+
+<script>
+/* ---------------- language ---------------- */
+let LANG = 'hi';
+try { if (localStorage.getItem('sehat_lang') === 'en') LANG = 'en'; } catch (e) {}
+const L = (hi, en) => LANG === 'en' ? en : hi;
+
+/* ---------------- icons ---------------- */
+const IC = {
+  pin: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+  phone: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2"/></svg>',
+  route: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/></svg>',
+  list: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+  shield: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>',
+  down: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  flip: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>',
+  speaker: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
+  home: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+};
+const emo = (d, c = '#0E4A3A') => `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const G = {
+  snake: emo('<path d="M4 18c3 2 7 1 8-2s-3-4-2-7 6-3 7 0"/><path d="M17 9h3"/>'),
+  burn: emo('<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-4 5-4 8-1-1-2-2-2-4-2 2-3 5-3 8 0 4 3 7 7 7z"/>'),
+  blood: emo('<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/>', '#B3261E'),
+  sun: emo('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', '#8A3A22'),
+  pill: emo('<rect x="3" y="9" width="18" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="m9 8 6 9"/>'),
+  drop: emo('<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/>'),
+  heart: emo('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
+  pulse: emo('<path d="M3 12h4l2-5 4 10 2-5h6"/>'),
+  band: emo('<rect x="3" y="8" width="18" height="8" rx="4"/><path d="M10 12h4M12 10v4"/>'),
+  syringe: emo('<path d="m18 2 4 4M15 5l4 4M9 11l4 4M4 20l3-3M7 13l4 4 8-8-4-4z"/>', '#8A3A22'),
+};
+
+/* ---------------- content (Hindi / English) ---------------- */
+function topics() { return [
+  {
+    id: 'hospital', n: '01', title: L('अस्पताल व क्लीनिक', 'Hospitals & Clinics'), short: L('अस्पताल', 'Hospitals'), line: L('सबसे पास: 0.5 किमी', 'Nearest: 0.5 km'), badge: L('₹0 पर्ची', '₹0 OPD slip'),
+    img: 'img/hospital_hero.jpg', card: 'img/hospital_card.jpg',
+    eyebrow: L('तिघरा व आसपास के सरकारी अस्पताल', 'Government hospitals in and around Tighra'),
+    h1: L('इलाज <em>पास</em> है,<br>और <em>मुफ़्त</em> है', 'Care is <em>close</em>,<br>and it is <em>free</em>'),
+    stats: [['₹0', L('ओपीडी पर्ची', 'OPD slip')], [L('0.5 किमी', '0.5 km'), L('आरोग्य मंदिर', 'Arogya Mandir')], ['24×7', L('CHC बरघाट', 'CHC Barghat')]],
+    say: L('तिघरा का आयुष्मान आरोग्य मंदिर सिर्फ़ आधा किलोमीटर दूर है। पर्ची मुफ़्त है। गंभीर हालत में एक सौ आठ पर कॉल करें।', 'The Ayushman Arogya Mandir in Tighra is only half a kilometre away. The OPD slip is free. In an emergency, call 108.'),
+    body: () => `
+      <section class="sec"><h2><span class="ic">${IC.pin}</span>${L('कहाँ जाएँ?', 'Where to go?')}</h2>
+        <div class="cards">
+          ${place(L('आयुष्मान आरोग्य मंदिर', 'Ayushman Arogya Mandir'), L('उप स्वास्थ्य केंद्र, तिघरा', 'Sub Health Centre, Tighra'), '0.5', L('पैदल 5 मिनट', '5 min on foot'), 'green', L('रोज़ सुबह 9 – शाम 4', 'Daily 9 am – 4 pm'), [L('बुखार, BP, शुगर जाँच', 'Fever, BP, sugar tests'), L('गर्भवती टीकाकरण', 'Pregnancy vaccinations')], 'ghost')}
+          ${place(L('सामुदायिक स्वास्थ्य केंद्र', 'Community Health Centre'), L('CHC बरघाट', 'CHC Barghat'), '8.5', L('वाहन से 15 मिनट', '15 min by vehicle'), 'red', L('24×7 आपातकाल', '24×7 emergency'), [L('प्रसव व शिशु देखभाल', 'Delivery & newborn care'), L('एक्स-रे, खून जाँच', 'X-ray, blood tests')], '')}
+          ${place(L('जिला चिकित्सालय', 'District Hospital'), L('सिवनी', 'Seoni'), '28', L('एम्बुलेंस से 35 मिनट', '35 min by ambulance'), 'red', L('ICU · गंभीर रोग', 'ICU · serious illness'), [L('हृदय, हड्डी, शिशु विशेषज्ञ', 'Heart, bone, child specialists'), L('ब्लड बैंक, सीटी स्कैन', 'Blood bank, CT scan')], 'red')}
+        </div>
+      </section>
+      <section class="sec"><h2><span class="ic">${IC.route}</span>${L('रास्ता', 'Route')}</h2>
+        <div class="route">
+          <div class="line"><span class="fill" data-fill="100"></span>
+            <span class="stop" style="left:0%"></span><span class="stop" style="left:30%"></span><span class="stop last" style="left:100%"></span></div>
+          <div class="labels"><span style="left:0"><b>${L('तिघरा', 'Tighra')}</b>0 ${KM()}</span><span style="left:30%;transform:translateX(-50%);text-align:center"><b>${L('बरघाट CHC', 'Barghat CHC')}</b>8.5 ${KM()} · ${L('15 मिनट', '15 min')}</span><span style="right:0;text-align:right"><b>${L('सिवनी', 'Seoni')}</b>28 ${KM()} · ${L('35 मिनट', '35 min')}</span></div>
+        </div>
+      </section>`,
+  },
+  {
+    id: 'transport', n: '02', title: L('वाहन व एम्बुलेंस', 'Transport & Ambulance'), short: L('वाहन', 'Transport'), line: L('108 · 15–20 मिनट में', '108 · in 15–20 min'), badge: L('मुफ़्त', 'Free'),
+    img: 'img/transport_hero.jpg', card: 'img/transport_card.jpg',
+    eyebrow: L('बरघाट ब्लॉक सेवा सक्रिय', 'Barghat block service active'),
+    h1: L('एक कॉल,<br><em>गाड़ी गाँव तक</em>', 'One call brings<br><em>a vehicle to the village</em>'),
+    stats: [['108', L('एम्बुलेंस', 'Ambulance')], [L('15–20 मि.', '15–20 min'), L('तिघरा पहुँचने में', 'to reach Tighra')], ['₹0', L('पूरी तरह मुफ़्त', 'completely free')]],
+    say: L('एक सौ आठ एम्बुलेंस मुफ़्त है और पंद्रह से बीस मिनट में तिघरा पहुँचती है। गर्भवती माताओं के लिए एक सौ दो जननी एक्सप्रेस है।', 'The 108 ambulance is free and reaches Tighra in 15 to 20 minutes. For pregnant mothers there is the 102 Janani Express.'),
+    body: () => `
+      <section class="sec"><h2><span class="ic">${IC.list}</span>${L('कौन-सी गाड़ी?', 'Which vehicle?')}</h2>
+        <div class="cards">
+          ${svc('108', L('एम्बुलेंस', 'Ambulance'), 'red', [L('दुर्घटना, हार्ट अटैक', 'Accident, heart attack'), L('गंभीर बीमारी', 'Serious illness')], L('मुफ़्त · 24×7', 'Free · 24×7'), '108')}
+          ${svc('102', L('जननी एक्सप्रेस', 'Janani Express'), 'green', [L('गर्भवती माताएँ', 'Pregnant mothers'), L('1 साल तक के शिशु', 'Babies up to 1 year'), L('घर वापसी भी मुफ़्त', 'Free ride home too')], L('मुफ़्त', 'Free'), '102')}
+          ${svc('₹15–20', L('ऑटो / शेयरिंग', 'Auto / shared'), '', [L('तिघरा तिराहा से', 'From Tighra tiraha'), L('हर 15 मिनट', 'Every 15 min'), L('सुबह 6:30 – रात 8:30', '6:30 am – 8:30 pm')], L('नियमित', 'Regular'), null)}
+        </div>
+      </section>
+      <section class="sec"><h2><span class="ic">${IC.phone.replace('currentColor', '#fff')}</span>${L('फ़ोन पर ये 3 बातें बताएँ', 'Say these 3 things on the call')}</h2>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><h3>${L('पता', 'Address')}</h3><p>${L('“ग्राम तिघरा, बरघाट रोड” और पास की पहचान, जैसे स्कूल या मंदिर।', '“Village Tighra, Barghat Road” and a landmark, like the school or temple.')}</p></div>
+          <div class="step"><span class="n">2</span><h3>${L('मरीज़ की हालत', 'Patient’s condition')}</h3><p>${L('बेहोशी, प्रसव पीड़ा, गंभीर चोट या साँस की तकलीफ़।', 'Unconscious, labour pain, serious injury or trouble breathing.')}</p></div>
+          <div class="step"><span class="n">3</span><h3>${L('फ़ोन चालू रखें', 'Keep the phone on')}</h3><p>${L('ड्राइवर रास्ता पूछने के लिए वापस कॉल करेगा।', 'The driver will call back to ask the way.')}</p></div>
+        </div>
+      </section>`,
+  },
+  {
+    id: 'firstaid', n: '03', title: L('प्राथमिक उपचार', 'First Aid'), short: L('उपचार', 'First aid'), line: L('डॉक्टर से पहले क्या करें', 'What to do before the doctor'), badge: L('पहले 15 मिनट', 'First 15 min'),
+    img: 'img/firstaid_hero.jpg', card: 'img/firstaid_card.jpg',
+    eyebrow: L('घबराएँ नहीं', 'Don’t panic'),
+    h1: L('सही <em>पहला कदम</em><br>जान बचाता है', 'The right <em>first step</em><br>saves a life'),
+    stats: [[L('15 मिनट', '15 min'), L('सबसे ज़रूरी', 'matter most')], [L('24 घंटे', '24 hrs'), L('पंचायत भवन फर्स्ट-एड', 'Panchayat first-aid box')]],
+    say: L('अस्पताल पहुँचने से पहले के पंद्रह मिनट सबसे ज़रूरी हैं। झाड़-फूँक या घरेलू लेप न करें। सही कदम नीचे देखें।', 'The fifteen minutes before reaching hospital matter most. Do not try faith healing or home pastes. See the right steps below.'),
+    body: () => `
+      <section class="sec"><h2><span class="ic">${IC.shield}</span>${L('क्या करें, क्या न करें', 'Do and don’t')}</h2>
+        <div class="dd">
+          ${dd(G.snake, L('साँप / बिच्छू का काटना', 'Snake / scorpion bite'), L('अंग स्थिर रखें, तुरंत CHC बरघाट। एंटी-वेनम मुफ़्त।', 'Keep the limb still, go to CHC Barghat now. Anti-venom is free.'), L('रस्सी कसकर न बाँधें। चीरा या झाड़-फूँक नहीं।', 'Don’t tie a tight rope. No cutting, no faith healing.'))}
+          ${dd(G.burn, L('जलना', 'Burns'), L('15–20 मिनट ठंडा बहता पानी डालें।', 'Pour cool running water for 15–20 min.'), L('टूथपेस्ट, गोबर या स्याही न लगाएँ।', 'No toothpaste, cow dung or ink.'))}
+          ${dd(G.blood, L('गहरी चोट, खून बहना', 'Deep cut, bleeding'), L('साफ़ कपड़े से 5 मिनट कसकर दबाएँ।', 'Press hard with a clean cloth for 5 min.'), L('राख, मिट्टी या तंबाकू न लगाएँ।', 'No ash, soil or tobacco.'))}
+          ${dd(G.sun, L('लू, उल्टी-दस्त', 'Heatstroke, vomiting'), L('छाँव में लिटाएँ, ORS घूँट-घूँट पिलाएँ।', 'Lay them in shade, give ORS sip by sip.'), L('बेहोश व्यक्ति के मुँह में कुछ न डालें।', 'Give nothing by mouth if unconscious.'))}
+        </div>
+      </section>
+      <section class="sec"><h2><span class="ic">${IC.list}</span>${L('घर पर ORS घोल', 'ORS at home')}</h2>
+        <div class="recipe">
+          <div class="ing"><b>${L('1 लीटर', '1 litre')}</b><span>${L('उबला, ठंडा पानी', 'boiled, cooled water')}</span></div>
+          <div class="ing"><b>${L('6 चम्मच', '6 tsp')}</b><span>${L('चीनी', 'sugar')}</span></div>
+          <div class="ing"><b>${L('½ चम्मच', '½ tsp')}</b><span>${L('नमक', 'salt')}</span></div>
+          <button class="cta" style="background:#F5C84B;color:#1B2420" data-call="104">${IC.phone} ${L('104 सलाह', '104 advice')}</button>
+        </div>
+      </section>
+      <section class="band"><div><h3>${L('गाँव में मदद', 'Help in the village')}</h3><p>${L('पंचायत भवन: फर्स्ट-एड बॉक्स 24 घंटे · आशा कार्यकर्ता सुमन बाई', 'Panchayat Bhawan: first-aid box 24 hrs · ASHA worker Suman Bai')}</p></div>
+        <button class="callbtn c104" data-call="104">104</button><button class="callbtn c108" data-call="108">108</button></section>`,
+  },
+  {
+    id: 'daily', n: '04', title: L('रोज़ की सेहत', 'Daily Health'), short: L('सेहत', 'Health'), line: L('पानी · आहार · हाथ धोना', 'Water · food · handwashing'), badge: L('3 नियम', '3 rules'),
+    img: 'img/daily_hero.jpg', card: 'img/daily_hero.jpg',
+    eyebrow: L('हर मंगलवार पोषण दिवस · हर गुरुवार टीकाकरण', 'Nutrition day every Tuesday · Vaccination every Thursday'),
+    h1: L('साफ़ पानी, देसी खाना:<br><em>सबसे बड़ी दवा</em>', 'Clean water, local food:<br><em>the best medicine</em>'),
+    stats: [[L('मंगलवार', 'Tuesday'), L('आँगनवाड़ी पोषण दिवस', 'Anganwadi nutrition day')], [L('गुरुवार', 'Thursday'), L('टीकाकरण दिवस', 'Vaccination day')]],
+    say: L('तीन आदतें बीमारी से बचाती हैं: साफ़ पानी, देसी पौष्टिक खाना, और साबुन से हाथ धोना।', 'Three habits protect against illness: clean water, nourishing local food, and washing hands with soap.'),
+    body: () => `
+      <section class="sec"><h2><span class="ic">${IC.shield}</span>${L('3 आसान नियम', '3 simple rules')}</h2>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><h3>${L('साफ़ पानी', 'Clean water')}</h3><p>${L('घड़ा ढककर रखें, लोटे से निकालें। शक हो तो उबालें।', 'Keep the pot covered, use a ladle. Boil if unsure.')}</p></div>
+          <div class="step"><span class="n">2</span><h3>${L('देसी आहार', 'Local food')}</h3><p>${L('मुनगा, हरी पालक, चना-गुड़ खून की कमी दूर करते हैं।', 'Drumstick, spinach and chana-jaggery fight anaemia.')}</p></div>
+          <div class="step"><span class="n">3</span><h3>${L('हाथ धोना', 'Handwashing')}</h3><p>${L('साबुन से 20 सेकंड: शौच के बाद, खाने से पहले।', 'Soap for 20 seconds: after the toilet, before eating.')}</p></div>
+        </div>
+      </section>
+      <section class="sec"><h2><span class="ic">${IC.list}</span>${L('आज मैंने क्या किया?', 'What did I do today?')} <span class="meta" style="font-family:var(--body);font-weight:500;font-size:18px">${L('छूकर चुनें', 'tap to choose')}</span></h2>
+        <div class="habits">
+          ${[L('घड़े का साफ़ पानी पिया', 'Drank clean, covered water'), L('साबुन से हाथ धोए', 'Washed hands with soap'), L('हरी सब्ज़ी या मुनगा खाया', 'Ate greens or drumstick'), L('गुड़-चना खाया', 'Ate jaggery and chana'), L('शौचालय का उपयोग किया', 'Used the toilet')].map((h, i) => `<button class="habit" data-habit="${i}" aria-pressed="false"><span class="box"></span>${h}</button>`).join('')}
+        </div>
+        <div class="score"><span>${L('आज का स्कोर', 'Today’s score')}</span><div class="meter"><i id="meter"></i></div><b id="scoreTxt">0 / 5</b></div>
+      </section>`,
+  },
+  {
+    id: 'medicine', n: '05', title: L('निःशुल्क दवाइयाँ', 'Free Medicines'), short: L('दवाइयाँ', 'Medicines'), line: L('300+ दवाएँ मुफ़्त', '300+ medicines free'), badge: L('सरकारी', 'Government'),
+    img: 'img/medicine_hero.jpg', card: 'img/medicine_card.jpg',
+    eyebrow: L('वितरण: सुबह 8 – दोपहर 2 बजे', 'Dispensing: 8 am – 2 pm'),
+    h1: L('सरकारी अस्पताल में<br>दवा <em>मुफ़्त</em> है', 'At government hospitals,<br>medicine is <em>free</em>'),
+    stats: [['300+', L('दवाएँ', 'medicines')], ['₹0', L('पर्ची व जाँच', 'slip and tests')], [L('₹5 लाख', '₹5 lakh'), L('आयुष्मान कार्ड', 'Ayushman card')]],
+    say: L('तिघरा उप-स्वास्थ्य केंद्र और बरघाट CHC में तीन सौ से ज़्यादा दवाएँ मुफ़्त मिलती हैं। समय सुबह आठ से दोपहर दो बजे।', 'More than three hundred medicines are free at the Tighra sub health centre and CHC Barghat, from 8 in the morning to 2 in the afternoon.'),
+    body: () => `
+      <section class="sec"><h2><span class="ic">${IC.list}</span>${L('ज़रूरी दवाएँ, स्टॉक में', 'Essential medicines in stock')}</h2>
+        <div class="meds">
+          ${med(G.pulse, L('पैरासिटामोल', 'Paracetamol'), L('बुखार, बदन दर्द', 'Fever, body ache'))}
+          ${med(G.drop, L('ORS व ज़िंक', 'ORS & zinc'), L('दस्त, उल्टी', 'Diarrhoea, vomiting'))}
+          ${med(G.heart, L('आयरन, फोलिक एसिड', 'Iron, folic acid'), L('खून की कमी, गर्भवती माँ', 'Anaemia, pregnant mothers'))}
+          ${med(G.pill, L('BP व शुगर', 'BP & sugar'), L('हर माह 9 तारीख, 30 दिन की दवा', '9th of every month, 30 days’ supply'))}
+          ${med(G.band, L('एंटीबायोटिक, मलहम', 'Antibiotics, ointment'), L('केवल डॉक्टर की पर्ची पर', 'Only on a doctor’s slip'))}
+          ${med(G.syringe, L('एंटी-रेबीज़, एंटी-वेनम', 'Anti-rabies, anti-venom'), L('CHC बरघाट, 24 घंटे', 'CHC Barghat, 24 hrs'))}
+        </div>
+      </section>
+      <section class="sec"><h2><span class="ic">${IC.shield}</span>${L('दवा लेते समय', 'When you take medicine')}</h2>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><h3>${L('पर्ची लाएँ', 'Bring the slip')}</h3><p>${L('सरकारी डॉक्टर की पर्ची काउंटर पर दिखाएँ।', 'Show the government doctor’s slip at the counter.')}</p></div>
+          <div class="step"><span class="n">2</span><h3>${L('पूरा कोर्स', 'Full course')}</h3><p>${L('आराम मिलने पर भी दवा बीच में न छोड़ें।', 'Don’t stop halfway, even if you feel better.')}</p></div>
+          <div class="step"><span class="n">3</span><h3>${L('तारीख देखें', 'Check the date')}</h3><p>${L('पैकेट पर एक्सपायरी तारीख ज़रूर जाँचें।', 'Always check the expiry date on the pack.')}</p></div>
+        </div>
+      </section>
+      <section class="band"><div><h3>${L('दवा नहीं मिली?', 'Medicine not available?')}</h3><p>${L('CHC बरघाट फार्मासिस्ट डेस्क, या टोल-फ्री हेल्पलाइन', 'CHC Barghat pharmacist desk, or the toll-free helpline')}</p></div>
+        <span></span><button class="callbtn c104" data-call="104">104</button></section>`,
+  },
+  {
+    id: 'myth', n: '06', title: L('सच या झूठ', 'Fact or Myth'), short: L('सच-झूठ', 'Fact/Myth'), line: L('गाँव की 4 बड़ी भ्रांतियाँ', '4 common village myths'), badge: L('जाँचें', 'Check'),
+    img: 'img/myth_hero.jpg', card: 'img/myth_card.jpg',
+    eyebrow: L('आशा दीदी की सलाह', 'Advice from ASHA didi'),
+    h1: L('सुनी-सुनाई बात,<br>या <em>सच?</em>', 'Something you heard,<br>or a <em>fact?</em>'),
+    stats: [['4', L('आम भ्रांतियाँ', 'common myths')], [L('छुएँ', 'Tap'), L('और सच देखें', 'to see the fact')]],
+    say: L('गाँव में सुनी जाने वाली चार बातें। हर कार्ड को छूकर सच जानें।', 'Four things often heard in the village. Tap each card to learn the fact.'),
+    body: () => `
+      <section class="sec"><h2><span class="ic">${IC.shield}</span>${L('कार्ड छुएँ, सच देखें', 'Tap a card, see the fact')}</h2>
+        <div class="myths">
+          ${myth(L('दस्त में पानी या माँ का दूध बंद कर दें।', 'Stop water or breastfeeding during diarrhoea.'), L('लगातार ORS, पानी और ज़िंक दें। स्तनपान जारी रखें।', 'Keep giving ORS, water and zinc. Continue breastfeeding.'))}
+          ${myth(L('साँप काटे तो झाड़-फूँक या चीरा लगाएँ।', 'For a snakebite, use faith healing or cut the wound.'), L('सीधे CHC बरघाट जाएँ। एंटी-वेनम इंजेक्शन मुफ़्त है।', 'Go straight to CHC Barghat. The anti-venom injection is free.'))}
+          ${myth(L('टीका लगवाने से बच्चा कमज़ोर होता है।', 'Vaccines make a child weak.'), L('टीका 12 घातक बीमारियों से बचाता है। हल्का बुखार सामान्य है।', 'Vaccines protect against 12 deadly diseases. A mild fever is normal.'))}
+          ${myth(L('गर्भावस्था में कम खाना चाहिए।', 'Eat less during pregnancy.'), L('एक थाली अतिरिक्त खाना, आयरन-कैल्शियम गोली (मुफ़्त)।', 'One extra plate of food, plus iron and calcium tablets (free).'))}
+        </div>
+      </section>
+      <section class="band"><div><h3>${L('कोई शंका हो तो पूछें', 'Any doubt? Ask')}</h3><p>${L('आशा कार्यकर्ता सुमन बाई · CHO पूजा मर्सकोले (आरोग्य मंदिर)', 'ASHA worker Suman Bai · CHO Pooja Marskole (Arogya Mandir)')}</p></div>
+        <button class="callbtn c104" data-call="104">104</button><button class="callbtn c108" data-call="108">108</button></section>`,
+  },
+]; }
+let TOPICS = topics();
+
+const KM = () => L('किमी', 'km');
+function place(name, sub, km, time, tone, hours, list, btn) {
+  return `<article class="card"><span class="pill ${tone}">${hours}</span>
+    <div class="km">${km}<small> ${KM()}</small></div><div class="meta">${time}</div>
+    <h3>${name}</h3><div class="meta" style="margin-top:-6px">${sub}</div>
+    <ul class="ticks">${list.map(l => `<li>${l}</li>`).join('')}</ul>
+    ${btn === 'red' ? `<button class="cta red" data-call="108">${IC.phone} ${L('108 एम्बुलेंस', '108 Ambulance')}</button>` : `<button class="cta ${btn}" data-toast="${L('रास्ता: तिघरा से बरघाट मुख्य पक्की सड़क', 'Route: Tighra to Barghat on the main paved road')}">${IC.route.replaceAll('#fff', 'currentColor')} ${L('रास्ता देखें', 'See route')}</button>`}</article>`;
+}
+function svc(big, name, tone, list, tag, call) {
+  return `<article class="card"><span class="pill ${tone}">${tag}</span><div class="km" style="color:${tone === 'red' ? 'var(--brick)' : 'var(--forest)'}">${big}</div><h3>${name}</h3>
+    <ul class="ticks">${list.map(l => `<li>${l}</li>`).join('')}</ul>
+    ${call ? `<button class="cta ${tone === 'red' ? 'red' : ''}" data-call="${call}">${IC.phone} ${L(call + ' पर कॉल', 'Call ' + call)}</button>` : `<button class="cta ghost" data-toast="${L('ऑटो स्टैंड: तिघरा तिराहा / मुख्य मंदिर चौक', 'Auto stand: Tighra tiraha / main temple square')}">${L('स्टैंड कहाँ है?', 'Where is the stand?')}</button>`}</article>`;
+}
+function dd(icon, title, d, n) {
+  return `<article class="ddcard"><header><span class="em">${icon}</span><h3>${title}</h3></header>
+    <div class="ddrow"><div class="do"><b>✓ ${L('करें', 'Do')}</b>${d}</div><div class="dont"><b>✕ ${L('न करें', 'Don’t')}</b>${n}</div></div></article>`;
+}
+function med(icon, name, use) {
+  return `<article class="med"><span class="ico">${icon}</span><div><h3>${name}</h3><p>${use}</p></div></article>`;
+}
+function myth(m, f) {
+  return `<button class="flip" aria-pressed="false"><div class="inner">
+    <div class="face myth"><span class="tag">✕ ${L('झूठ', 'Myth')}</span><q>${m}</q><span class="hint">${IC.flip} ${L('छूकर सच देखें', 'Tap to see the fact')}</span></div>
+    <div class="face fact"><span class="tag">✓ ${L('सच', 'Fact')}</span><p>${f}</p><span class="hint">${IC.flip} ${L('वापस पलटें', 'Flip back')}</span></div>
+  </div></button>`;
+}
+
+/* ---------------- screens ---------------- */
+const stage = document.getElementById('stage');
+const HOME_SAY = () => L('नमस्ते। किसी भी चित्र को छुएँ। अस्पताल, एम्बुलेंस, प्राथमिक उपचार, रोज़ की सेहत, मुफ़्त दवाइयाँ, या सच और झूठ।', 'Namaste. Tap any picture: hospitals, ambulance, first aid, daily health, free medicines, or fact and myth.');
+function homeHTML() {
+  return `<div class="wrap">
+    <section class="welcome"><div><h1>${L('नमस्ते! आज क्या जानना है?', 'Namaste! What would you like to know?')}</h1><p>${L('किसी भी चित्र को छुएँ · हर जानकारी मुफ़्त और सरकारी', 'Tap any picture · all information is free and from government services')}</p></div>
+      <button class="chip audio" data-say="home">${IC.speaker} ${L('बोलकर सुनें', 'Listen')}</button></section>
+    <div class="tiles">${TOPICS.map(t => `<button class="tile" data-go="${t.id}">
+      <img src="${t.card}" alt="" loading="lazy"><span class="num">${t.n}</span><span class="badge">${t.badge}</span>
+      <span class="cap"><h2>${t.title}</h2><span>${t.line}</span></span></button>`).join('')}</div>
+    <section class="sosbar"><b>${L('आपातकाल', 'Emergency')}</b>
+      <button class="callbtn c108" data-call="108">108 <small>${L('एम्बुलेंस', 'Ambulance')}</small></button>
+      <button class="callbtn c104" data-call="104">104 <small>${L('डॉक्टर सलाह', 'Doctor advice')}</small></button>
+      <button class="callbtn c181" data-call="181">181 <small>${L('महिला हेल्पलाइन', 'Women helpline')}</small></button></section>
+  </div>`;
+}
+function topicHTML(t) {
+  return `<section class="hero"><img src="${t.img}" alt="">
+      <div class="in"><span class="eyebrow">${t.n} · ${t.eyebrow}</span><h1>${t.h1}</h1>
+        <div class="bigstat">${t.stats.map(s => `<div><b data-count>${s[0]}</b><span>${s[1]}</span></div>`).join('')}</div>
+        <button class="scrollcue" data-more>${IC.down} ${L('नीचे और जानें', 'Scroll to learn more')}</button></div></section>
+    <div class="wrap">${t.body()}</div>`;
+}
+let screens = {};
+let current = 'home';
+function build() {
+  stage.innerHTML = ''; screens = {};
+  const h = document.createElement('div'); h.className = 'screen'; h.dataset.screen = 'home'; h.innerHTML = homeHTML(); stage.appendChild(h); screens.home = h;
+  for (const t of TOPICS) {
+    const s = document.createElement('div'); s.className = 'screen'; s.dataset.screen = t.id; s.hidden = true; s.innerHTML = topicHTML(t); stage.appendChild(s); screens[t.id] = s;
+  }
+  const nav = document.getElementById('nav');
+  nav.setAttribute('aria-label', L('विषय', 'Topics'));
+  nav.innerHTML = `<button data-go="home">${IC.home}${L('मुख्य', 'Home')}</button>` +
+    TOPICS.map(t => `<button data-go="${t.id}"><span style="font-family:var(--display);font-weight:800;font-size:18px">${t.n}</span>${t.short}</button>`).join('');
+  /* header */
+  document.documentElement.lang = LANG;
+  document.getElementById('brandName').textContent = L('चित्ररेखा सेहत सेतु', 'Chitrarekha Sehat Setu');
+  document.getElementById('brandSub').textContent = L('ग्राम तिघरा, बरघाट · कियोस्क TGH-01', 'Village Tighra, Barghat · Kiosk TGH-01');
+  document.getElementById('brand').setAttribute('aria-label', L('मुख्य पृष्ठ', 'Home'));
+  document.getElementById('audioLbl').textContent = L('सुनें', 'Listen');
+  document.getElementById('sosTop').textContent = L('108 आपातकाल', '108 Emergency');
+  document.getElementById('sheetTitle').textContent = L('अपने फ़ोन से यह नंबर मिलाएँ', 'Dial this number from your phone');
+  document.getElementById('sheetClose').textContent = L('ठीक है', 'OK');
+  document.querySelectorAll('#lang [data-l]').forEach(s => s.classList.toggle('on', s.dataset.l === LANG));
+  document.title = L('चित्ररेखा सेहत सेतु', 'Chitrarekha Sehat Setu');
+}
+build();
+
+function go(id) {
+  if (!screens[id]) return;
+  stopSpeech();
+  if (id !== current || screens[id].hidden) {
+    Object.values(screens).forEach(s => { s.hidden = true; });
+    const s = screens[id]; s.hidden = false; s.scrollTop = 0;
+    s.classList.remove('enter'); void s.offsetWidth; s.classList.add('enter');
+    current = id;
+  }
+  document.querySelectorAll('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.go === id ? 'page' : 'false'));
+  if (id !== 'home') animateTopic(screens[id]);
+  try { if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id); } catch (e) {}
+}
+function animateTopic(s) {
+  s.querySelectorAll('.fill').forEach(f => { f.style.width = '0'; requestAnimationFrame(() => requestAnimationFrame(() => f.style.width = f.dataset.fill + '%')); });
+  s.querySelectorAll('[data-count]').forEach(el => {
+    const txt = el.textContent, m = txt.match(/^([^\d]*)(\d[\d,]*)(.*)$/);
+    if (!m || !/\+/.test(txt) || document.documentElement.classList.contains('doc') || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const target = parseInt(m[2].replace(/,/g, ''), 10); if (target < 2) return;
+    const t0 = performance.now();
+    const tick = now => { const k = Math.min(1, (now - t0) / 700); el.textContent = m[1] + Math.round(target * (1 - Math.pow(1 - k, 3))) + m[3]; if (k < 1) requestAnimationFrame(tick); else el.textContent = txt; };
+    requestAnimationFrame(tick);
+  });
+}
+function setLang(l) {
+  if (l === LANG) return;
+  stopSpeech();
+  LANG = l; try { localStorage.setItem('sehat_lang', l); } catch (e) {}
+  TOPICS = topics(); const keep = current; current = null; build(); go(keep);
+  toast(L('भाषा: हिंदी', 'Language: English'));
+}
+
+/* ---------------- interactions ---------------- */
+const sheet = document.getElementById('sheet'), toastEl = document.getElementById('toast');
+const callInfo = () => ({ 108: L('एम्बुलेंस · कॉल मुफ़्त · 24 घंटे', 'Ambulance · free call · 24 hrs'), 104: L('डॉक्टर सलाह · कॉल मुफ़्त', 'Doctor advice · free call'), 102: L('जननी एक्सप्रेस · माँ व शिशु', 'Janani Express · mother and baby'), 181: L('महिला हेल्पलाइन · 24 घंटे', 'Women helpline · 24 hrs') });
+let toastT;
+function toast(msg) { toastEl.textContent = msg; toastEl.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => toastEl.hidden = true, 2600); }
+
+document.addEventListener('click', e => {
+  const lg = e.target.closest('#lang');
+  if (lg) { const pick = e.target.closest('[data-l]'); setLang(pick ? pick.dataset.l : (LANG === 'hi' ? 'en' : 'hi')); return; }
+  const g = e.target.closest('[data-go]'); if (g) { go(g.dataset.go); return; }
+  const c = e.target.closest('[data-call]');
+  if (c) { document.getElementById('sheetNum').textContent = c.dataset.call; document.getElementById('sheetSub').textContent = callInfo()[c.dataset.call] || ''; sheet.hidden = false; document.getElementById('sheetClose').focus(); return; }
+  if (e.target.closest('#sheetClose') || e.target === sheet) { sheet.hidden = true; return; }
+  const t = e.target.closest('[data-toast]'); if (t) { toast(t.dataset.toast); return; }
+  const more = e.target.closest('[data-more]');
+  if (more) { const s = screens[current]; s.scrollTo({ top: s.querySelector('.wrap').offsetTop - 10, behavior: 'smooth' }); return; }
+  const f = e.target.closest('.flip'); if (f) { f.setAttribute('aria-pressed', f.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); return; }
+  const h = e.target.closest('.habit');
+  if (h) {
+    h.setAttribute('aria-pressed', h.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    const done = screens[current].querySelectorAll('.habit[aria-pressed="true"]').length;
+    document.getElementById('meter').style.width = (done / 5 * 100) + '%';
+    document.getElementById('scoreTxt').textContent = done + ' / 5';
+    if (done === 5) toast(L('शाबाश! आज की पाँचों आदतें पूरी', 'Well done! All five habits today'));
+    return;
+  }
+  const sayBtn = e.target.closest('[data-say]'); if (sayBtn) { speak(HOME_SAY(), sayBtn); return; }
+  if (e.target.closest('#audio')) { const tp = TOPICS.find(x => x.id === current); speak(tp ? tp.say : HOME_SAY(), document.getElementById('audio')); return; }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') sheet.hidden = true; });
+
+/* ---------------- audio: device text-to-speech, Hindi (hi-IN) or English (en-IN) ---------------- */
+let VOICES = [];
+function loadVoices() { try { VOICES = speechSynthesis.getVoices() || []; } catch (e) { VOICES = []; } }
+loadVoices();
+try { speechSynthesis.addEventListener('voiceschanged', loadVoices); } catch (e) {}
+function pickVoice() {
+  if (!VOICES.length) loadVoices();
+  const by = p => VOICES.find(v => v.lang && v.lang.replace('_', '-').toLowerCase().startsWith(p));
+  return LANG === 'en' ? (by('en-in') || by('en-gb') || by('en')) : (by('hi-in') || by('hi'));
+}
+let speaking = null;
+function stopSpeech() {
+  try { speechSynthesis.cancel(); } catch (e) {}
+  document.querySelectorAll('.chip.audio').forEach(b => b.classList.remove('on'));
+  const lbl = document.getElementById('audioLbl'); if (lbl) lbl.textContent = L('सुनें', 'Listen');
+  speaking = null;
+}
+function speak(text, btn) {
+  if (speaking) { stopSpeech(); return; }
+  if (!('speechSynthesis' in window)) { toast(L('इस डिवाइस पर आवाज़ उपलब्ध नहीं', 'Voice is not available on this device')); return; }
+  btn.classList.add('on'); if (btn.id === 'audio') document.getElementById('audioLbl').textContent = L('रोकें', 'Stop');
+  speaking = btn;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = LANG === 'en' ? 'en-IN' : 'hi-IN'; u.rate = LANG === 'en' ? .95 : .9;
+  const v = pickVoice(); if (v) u.voice = v;
+  let started = false;
+  u.onstart = () => { started = true; };
+  u.onend = () => { if (speaking === btn) stopSpeech(); };
+  u.onerror = () => { if (speaking === btn) stopSpeech(); };
+  speechSynthesis.speak(u);
+  if (speechSynthesis.paused) speechSynthesis.resume();
+  setTimeout(() => {
+    if (speaking === btn && !started && !speechSynthesis.speaking) {
+      stopSpeech();
+      toast(L('इस डिवाइस पर हिंदी आवाज़ नहीं मिली', 'No voice found on this device'));
+    }
+  }, 3000);
+}
+
+/* ---------------- testing tool: tap log + heat map (#test) ---------------- */
+const heat = document.getElementById('heat'), app = document.getElementById('app');
+let taps = [];
+function loadTaps() { try { taps = JSON.parse(localStorage.getItem('sehat_taps') || '[]'); } catch (e) { taps = []; } }
+function saveTaps() { try { localStorage.setItem('sehat_taps', JSON.stringify(taps)); } catch (e) {} }
+function enableTest() {
+  loadTaps(); document.getElementById('testbar').hidden = false; document.getElementById('tapCount').textContent = taps.length;
+  app.addEventListener('pointerdown', e => {
+    if (e.target.closest('#testbar')) return;
+    const r = app.getBoundingClientRect(), s = screens[current];
+    taps.push({ s: current, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top + (s ? s.scrollTop : 0)) / r.height, t: Date.now() });
+    saveTaps(); document.getElementById('tapCount').textContent = taps.length;
+  }, true);
+}
+let heatOn = false;
+function drawHeat() {
+  const r = app.getBoundingClientRect(); heat.width = r.width; heat.height = r.height;
+  const ctx = heat.getContext('2d'); ctx.clearRect(0, 0, r.width, r.height); if (!heatOn) return;
+  const s = screens[current], off = s ? s.scrollTop : 0;
+  const pts = taps.filter(p => p.s === current);
+  const a = document.createElement('canvas'); a.width = r.width; a.height = r.height; const ac = a.getContext('2d');
+  for (const p of pts) { const x = p.x * r.width, y = p.y * r.height - off; const g = ac.createRadialGradient(x, y, 0, x, y, 46); g.addColorStop(0, 'rgba(0,0,0,.35)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ac.fillStyle = g; ac.fillRect(x - 46, y - 46, 92, 92); }
+  const img = ac.getImageData(0, 0, r.width, r.height), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const v = d[i + 3] / 255; if (!v) continue; const h = Math.min(1, v * 1.6); d[i] = 255 * Math.min(1, h * 2); d[i + 1] = 255 * Math.min(1, 2 - h * 2) * (h > .5 ? 1 : h * 2); d[i + 2] = 255 * Math.max(0, 1 - h * 3); d[i + 3] = 150 * Math.min(1, v * 2); }
+  ctx.putImageData(img, 0, 0);
+}
+document.getElementById('heatShow').addEventListener('click', () => { heatOn = !heatOn; document.getElementById('heatShow').textContent = heatOn ? 'Hide heat map' : 'Show heat map'; drawHeat(); });
+document.getElementById('heatClear').addEventListener('click', () => { taps = []; saveTaps(); document.getElementById('tapCount').textContent = 0; drawHeat(); });
+stage.addEventListener('scroll', () => heatOn && drawHeat(), true);
+
+/* deep links: #hospital … #myth open a topic; #en / #hi pick the language; #test enables the tap recorder */
+const h0 = location.hash.slice(1);
+const mode = h0.match(/^doc-?([a-z]*)-?([a-z]*)$/);
+if (mode) {
+  document.documentElement.classList.add('doc');
+  const st = mode[2];
+  if (st === 'en') { LANG = 'en'; TOPICS = topics(); current = null; build(); }
+  else if (LANG !== 'hi') { LANG = 'hi'; TOPICS = topics(); current = null; build(); }
+  go(screens[mode[1]] ? mode[1] : 'home');
+  if (st === 'flip') document.querySelectorAll('.flip')[0].click(), document.querySelectorAll('.flip')[2].click();
+  if (st === 'habits') [0, 1, 2].forEach(i => screens[current].querySelector(`[data-habit="${i}"]`).click());
+  if (st === 'call') { document.documentElement.classList.remove('doc'); screens[current].querySelector('[data-call="108"]').click(); }
+} else {
+  if (h0 === 'en' || h0 === 'hi') { if (h0 !== LANG) { LANG = h0; TOPICS = topics(); build(); } go('home'); }
+  else if (h0 === 'test') { go('home'); enableTest(); }
+  else go(screens[h0] ? h0 : 'home');
+}
+window.addEventListener('hashchange', () => { const k = location.hash.slice(1); if (k === 'en' || k === 'hi') setLang(k); else if (screens[k]) go(k); });
+</script>
+
+</body>
+</html>
